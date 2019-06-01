@@ -40,7 +40,10 @@ func getFrames(skip int) []runtime.Frame {
 	selectedFrames := make([]runtime.Frame, 0)
 	more := true
 	var current runtime.Frame
-	for !more {
+	for {
+		if !more {
+			break
+		}
 		current, more = frames.Next()
 		selectedFrames = append(selectedFrames, current)
 	}
