@@ -20,24 +20,23 @@ const (
 	CallStackCallerFormat = "%s:%v"
 )
 
-func NewStackTrace(skip int) *StackTrace {
-	frames := getFrames(skip)
+func NewStackTrace(skip, maxCallStackSize int) *StackTrace {
+	frames := getFrames(skip, maxCallStackSize)
 	return &StackTrace{
 		Caller:     getCaller(frames),
 		StackTrace: getTrace(frames),
 	}
 }
 
-func getFrames(skip int) []runtime.Frame {
-	programCounters := make([]uintptr, 10)
+func getFrames(skip, maxCallStackSize int) []runtime.Frame {
+	selectedFrames := make([]runtime.Frame, 0)
+	programCounters := make([]uintptr, maxCallStackSize)
 	n := runtime.Callers(3+skip, programCounters)
 	if n <= 0 {
-		return []runtime.Frame{{Function: "unknown"}}
+		return selectedFrames
 	}
 
 	frames := runtime.CallersFrames(programCounters[:n])
-
-	selectedFrames := make([]runtime.Frame, 0)
 	more := true
 	var current runtime.Frame
 	for {
