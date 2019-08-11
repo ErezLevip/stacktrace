@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/json-iterator/go"
 	"io"
 	"runtime"
 	"strings"
@@ -109,10 +110,19 @@ func (t *StackTrace) Read(p []byte) (n int, err error) {
 	return t.reader.Read(p)
 }
 
-func (t *StackTrace) ToJson() (string, error) {
-	b, err := json.Marshal(t)
+func (t *StackTrace) ToJson() (io.Reader, error) {
+	buff := new(bytes.Buffer)
+	if err := jsoniter.NewEncoder(buff).Encode(t);err != nil{
+		return nil, err
+	}
+	return buff, nil
+}
+
+func (t *StackTrace) ToJsonString() (string, error) {
+	b, err := jsoniter.Marshal(t)
 	if err != nil {
 		return "", err
 	}
 	return string(b), nil
 }
+
