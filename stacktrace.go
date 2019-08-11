@@ -21,11 +21,11 @@ const (
 	callStackFrameFormat  = "%s:%v:func:%s\n\t"
 	callStackCallerFormat = "%s:%v"
 	maxFramesSize         = 10
-	skipBase = 3
+	skipBase              = 3
 )
 
 func NewStackTrace(skip int) *StackTrace {
-	frames := getFrames(skip+skipBase)
+	frames := getFrames(skip + skipBase)
 	return &StackTrace{
 		Caller:     getCaller(frames),
 		StackTrace: getTrace(frames),
@@ -90,6 +90,9 @@ func getTrace(frames []runtime.Frame) string {
 
 func formatTrace(s string) string {
 	sp := strings.Split(s, "/")
+	if len(sp) < 2 {
+		return s
+	}
 	return strings.Join(sp[len(sp)-2:], "/")
 }
 
@@ -112,7 +115,7 @@ func (t *StackTrace) Read(p []byte) (n int, err error) {
 
 func (t *StackTrace) ToJson() (io.Reader, error) {
 	buff := new(bytes.Buffer)
-	if err := jsoniter.NewEncoder(buff).Encode(t);err != nil{
+	if err := jsoniter.NewEncoder(buff).Encode(t); err != nil {
 		return nil, err
 	}
 	return buff, nil
@@ -125,4 +128,3 @@ func (t *StackTrace) ToJsonString() (string, error) {
 	}
 	return string(b), nil
 }
-
