@@ -7,6 +7,7 @@ import (
 	"io"
 	"runtime"
 	"strings"
+	"sync"
 )
 
 type StackTrace struct {
@@ -16,47 +17,71 @@ type StackTrace struct {
 }
 
 const (
-	CallStackFrameFormat  = "%s:%v:func:%s\n\t"
-	CallStackCallerFormat = "%s:%v"
+	callStackFrameFormat  = "%s:%v:func:%s\n\t"
+	callStackCallerFormat = "%s:%v"
+	maxFramesSize         = 10
+	skipBase = 3
 )
 
-func NewStackTrace(skip, maxCallStackSize int) *StackTrace {
-	frames := getFrames(skip, maxCallStackSize)
+func NewStackTrace(skip int) *StackTrace {
+	frames := getFrames(skip+skipBase)
 	return &StackTrace{
 		Caller:     getCaller(frames),
 		StackTrace: getTrace(frames),
 	}
 }
 
-func getFrames(skip, maxCallStackSize int) []runtime.Frame {
-	selectedFrames := make([]runtime.Frame, 0)
-	programCounters := make([]uintptr, maxCallStackSize)
-	n := runtime.Callers(3+skip, programCounters)
+var framesPool *sync.Pool
+var ptrsPool *sync.Pool
+
+func init() {
+	framesPool = &sync.Pool{
+		New: func() interface{} { return make([]runtime.Frame, maxFramesSize) },
+	}
+	ptrsPool = &sync.Pool{
+		New: func() interface{} { return make([]uintptr, maxFramesSize) },
+	}
+}
+
+func getFrames(skip int) []runtime.Frame {
+	i := 0
+	selectedFrames := framesPool.Get().([]runtime.Frame)
+	programCounters := ptrsPool.Get().([]uintptr)
+
+	defer func() {
+		framesPool.Put(selectedFrames)
+		ptrsPool.Put(programCounters)
+	}()
+
+	n := runtime.Callers(skip, programCounters)
 	if n <= 0 {
 		return selectedFrames
 	}
 
 	frames := runtime.CallersFrames(programCounters[:n])
+
 	more := true
 	var current runtime.Frame
 	for {
-		if !more {
+		if !more || i >= maxFramesSize {
 			break
 		}
+
 		current, more = frames.Next()
-		selectedFrames = append(selectedFrames, current)
+		selectedFrames[i] = current
+		i++
 	}
 
-	return selectedFrames
+	return selectedFrames[:i]
 }
 
 func getCaller(frames []runtime.Frame) string {
-	return fmt.Sprintf(CallStackCallerFormat, formatTrace(frames[0].File), frames[0].Line)
+	return fmt.Sprintf(callStackCallerFormat, formatTrace(frames[0].File), frames[0].Line)
 }
 func getTrace(frames []runtime.Frame) string {
 	sb := &strings.Builder{}
 	for _, f := range frames[1:] {
-		sb.WriteString(fmt.Sprintf(CallStackFrameFormat, f.File, f.Line, strings.TrimLeft(f.Func.Name(), f.File)))
+		sb.WriteString(fmt.Sprintf(callStackFrameFormat, f.File, f.Line, strings.TrimLeft(f.Func.Name(), f.File)))
 	}
 
 	return sb.String()
